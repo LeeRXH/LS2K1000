@@ -2,6 +2,97 @@
 import LPi.GPIO as GPIO
 import time
 GPIO.setmode(GPIO.LS2K)
+
+
+TRIG = 9					
+ECHO = 11                    
+LEFT=4
+RIGHT=5
+
+#小车控制函数
+def Forward():
+    if guangming()==0:
+      GPIO.output(LEFT,GPIO.LOW)
+      GPIO.output(RIGHT,GPIO.LOW)
+      print("小车前进")
+    else:
+      stop()
+def left():
+    if guangming()==0:
+      GPIO.output(LEFT,GPIO.LOW)
+      GPIO.output(RIGHT,GPIO.HIGH)
+      print("小车左转")
+    else:
+      stop()
+def right():
+    GPIO.output(LEFT,GPIO.HIGH)
+    GPIO.output(RIGHT,GPIO.LOW)   
+    print("小车右转") 
+def stop():
+    GPIO.output(LEFT,GPIO.HIGH)
+    GPIO.output(RIGHT,GPIO.HIGH) 
+    print("小车停止")
+
+#超声波测距函数
+def send_trigger_pulse():
+    #发送超声波，一直发
+    GPIO.output(TRIG,1)
+    # 为了防止错误，因为紧接着就需要把发射端置为高电平
+    time.sleep(0.0001)
+    #发射端置为高电平
+    GPIO.output(TRIG,0)
+ 
+#'''
+#ECHO 负责接收超声波
+#'''
+def wait_for_echo(value,timeout):
+    count = timeout
+    #通过该代码持续获取ECHO的状态
+    while GPIO.input(ECHO)!= value and count>0:
+        count = count-1
+ 
+#'''
+#计算距离
+#'''
+def get_distance():
+    # 发射
+    send_trigger_pulse()
+    # 接收高电平 1/True
+    wait_for_echo(True,10000)
+    # 等待
+    start = time.time()
+    #接收低电平
+    wait_for_echo(False,10000)
+    finish = time.time()
+    pulse_len = finish-start
+    distance_cm = pulse_len/0.000058
+    return distance_cm
+
+def fangdouget():
+    distance0=get_distance()
+    distance1=get_distance()
+    while abs(distance0-distance1)>5:
+      distance0=get_distance()
+      distance1=get_distance()
+    distance=(distance0+distance1)/2  
+    return distance  
+     
+#避障函数
+def Obstacle_Avoidance():
+    dis= fangdouget()
+    print("距离 ",dis,"cm")
+    if (dis<30):              #距离小于30cm时启动避障程序
+        stop()
+        time.sleep(5)
+        while(dis<30):   
+          left()
+          time.sleep(0.5)
+          dis = fangdouget()
+    Forward()				#继续前进
+
+
+
+
 def init():
   LED_PIN1 = 1
   LED_PIN2 = 2
@@ -38,6 +129,8 @@ def init():
   GPIO.output(LED_PIN9, GPIO.HIGH)
   GPIO.setup(LED_PIN11, GPIO.IN)
 
+
+
 def shuiwei():
   shuiwei_out= 6
   baojing_pin= 8
@@ -45,7 +138,7 @@ def shuiwei():
   if SHUIWEI==0:
     print('水位低')
     GPIO.output(baojing_pin, GPIO.LOW)
-    time.sleep(5)
+    time.sleep(0.5)
     GPIO.output(baojing_pin, GPIO.HIGH)
     return 0
   else :
@@ -122,7 +215,11 @@ def dianji(val):
 if __name__=='__main__':
     distance = 0
     init()
-    while True:
+    try:
+      Forward()#初始状态为前进
+      while True:
+        Obstacle_Avoidance()
+        print("超声波避障系统运行中,按Ctrl+C退出...")
         waterlevel=shuiwei()
         cup=guangming()
         if cup==0:
@@ -155,4 +252,5 @@ if __name__=='__main__':
               dianji(1)  
         else:
             dianji(1)
-            time.sleep(1)
+    except KeyboardInterrupt:
+      stop()
